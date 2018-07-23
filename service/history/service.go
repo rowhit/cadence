@@ -66,6 +66,7 @@ type Config struct {
 	TimerProcessorMaxPollRPS                       dynamicconfig.IntPropertyFn
 	TimerProcessorMaxPollInterval                  dynamicconfig.DurationPropertyFn
 	TimerProcessorMaxPollIntervalJitterCoefficient dynamicconfig.FloatPropertyFn
+	TimerProcessorMaxTimeShift                     dynamicconfig.DurationPropertyFn
 
 	// TransferQueueProcessor settings
 	TransferTaskBatchSize                              dynamicconfig.IntPropertyFn
@@ -131,6 +132,7 @@ func NewConfig(dc *dynamicconfig.Collection, numberOfShards int) *Config {
 		TimerProcessorFailoverMaxPollRPS:                    dc.GetIntProperty(dynamicconfig.TimerProcessorFailoverMaxPollRPS, 1),
 		TimerProcessorMaxPollRPS:                            dc.GetIntProperty(dynamicconfig.TimerProcessorMaxPollRPS, 20),
 		TimerProcessorMaxPollInterval:                       dc.GetDurationProperty(dynamicconfig.TimerProcessorMaxPollInterval, 5*time.Minute),
+		TimerProcessorMaxTimeShift:                          dc.GetDurationProperty(dynamicconfig.TimerProcessorMaxPollInterval, 1*time.Second),
 		TimerProcessorMaxPollIntervalJitterCoefficient:      dc.GetFloat64Property(dynamicconfig.TimerProcessorMaxPollIntervalJitterCoefficient, 0.15),
 		TransferTaskBatchSize:                               dc.GetIntProperty(dynamicconfig.TransferTaskBatchSize, 100),
 		TransferProcessorFailoverMaxPollRPS:                 dc.GetIntProperty(dynamicconfig.TransferProcessorFailoverMaxPollRPS, 1),

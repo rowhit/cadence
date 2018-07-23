@@ -94,7 +94,7 @@ func newTimerQueueActiveProcessor(shard ShardContext, historyService *historyEng
 }
 
 func newTimerQueueFailoverProcessor(shard ShardContext, historyService *historyEngineImpl, domainID string, standbyClusterName string,
-	minLevel time.Time, maxLevel time.Time, matchingClient matching.Client, logger bark.Logger) *timerQueueActiveProcessorImpl {
+	minLevel time.Time, matchingClient matching.Client, logger bark.Logger) *timerQueueActiveProcessorImpl {
 	clusterName := shard.GetService().GetClusterMetadata().GetCurrentClusterName()
 	timeNow := func() time.Time {
 		// should use current cluster's time when doing domain failover
@@ -109,8 +109,7 @@ func newTimerQueueFailoverProcessor(shard ShardContext, historyService *historyE
 		return verifyFailoverActiveTask(logger, domainID, timer.DomainID, timer)
 	}
 
-	timerQueueAckMgr := newTimerQueueFailoverAckMgr(shard, historyService.metricsClient, standbyClusterName, minLevel,
-		maxLevel, logger)
+	timerQueueAckMgr := newTimerQueueFailoverAckMgr(shard, historyService.metricsClient, standbyClusterName, minLevel, logger)
 	retryableMatchingClient := matching.NewRetryableClient(matchingClient, common.CreateMatchingRetryPolicy(),
 		common.IsWhitelistServiceTransientError)
 	processor := &timerQueueActiveProcessorImpl{

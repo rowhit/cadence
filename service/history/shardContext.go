@@ -72,6 +72,8 @@ type (
 		GetTimeSource() common.TimeSource
 		SetCurrentTime(cluster string, currentTime time.Time)
 		GetCurrentTime(cluster string) time.Time
+		GetTimerMaxReadLevel() time.Time
+		UpdateTimerMaxReadLevel() time.Time
 	}
 
 	shardContextImpl struct {
@@ -95,6 +97,7 @@ type (
 		transferSequenceNumber    int64
 		maxTransferSequenceNumber int64
 		transferMaxReadLevel      int64
+		timerMaxReadLevel         time.Time
 
 		// exist only in memory
 		standbyClusterCurrentTime map[string]time.Time
@@ -245,6 +248,21 @@ func (s *shardContextImpl) UpdateDomainNotificationVersion(domainNotificationVer
 
 	s.shardInfo.DomainNotificationVersion = domainNotificationVersion
 	return s.updateShardInfoLocked()
+}
+
+func (s *shardContextImpl) GetTimerMaxReadLevel() time.Time {
+	s.RLock()
+	defer s.RUnlock()
+
+	return s.timerMaxReadLevel
+}
+
+func (s *shardContextImpl) UpdateTimerMaxReadLevel() time.Time {
+	s.Lock()
+	defer s.Unlock()
+
+	s.timerMaxReadLevel = s.GetTimeSource().Now().Add(s.config.TimerProcessorMaxTimeShift())
+	return s.timerMaxReadLevel
 }
 
 func (s *shardContextImpl) CreateWorkflowExecution(request *persistence.CreateWorkflowExecutionRequest) (
@@ -657,13 +675,12 @@ func (s *shardContextImpl) allocateTimerIDsLocked(timerTasks []persistence.Task)
 	// assign IDs for the timer tasks. They need to be assigned under shard lock.
 	for _, task := range timerTasks {
 		ts := persistence.GetVisibilityTSFrom(task)
-		if ts.Before(s.shardInfo.TimerAckLevel) {
-			// This is not a common scenario, the shard can move and new host might have a time SKU.
-			// We generate a new timer ID that is above the ack level with an offset.
-			s.logger.Warnf("%v: New timer generated is less than ack level. timestamp: %v, ackLevel: %v",
-				time.Now(), ts, s.shardInfo.TimerAckLevel)
-			newTimestamp := s.shardInfo.TimerAckLevel
-			persistence.SetVisibilityTSFrom(task, newTimestamp.Add(time.Second))
+		if ts.Before(s.timerMaxReadLevel) {
+			// This can happen if shard move and new host have a time SKU, or there is db write delay.
+			// We generate a new timer ID using timerMaxReadLevel.
+			s.logger.Warnf("%v: New timer generated is less than read level. timestamp: %v, timerMaxReadLevel: %v",
+				time.Now(), ts, s.timerMaxReadLevel)
+			persistence.SetVisibilityTSFrom(task, s.timerMaxReadLevel.Add(time.Millisecond))
 		}
 
 		seqNum, err := s.getNextTransferTaskIDLocked()
@@ -742,6 +759,7 @@ func acquireShard(shardID int, svc service.Service, shardManager persistence.Sha
 		metricsClient:    metricsClient,
 		config:           config,
 		standbyClusterCurrentTime: standbyClusterCurrentTime,
+		timerMaxReadLevel:         updatedShardInfo.TimerAckLevel, // use ack to init read level
 	}
 	context.logger = logger.WithFields(bark.Fields{
 		logging.TagHistoryShardID: shardID,
