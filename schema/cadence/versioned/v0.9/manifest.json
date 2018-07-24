@@ -4,6 +4,7 @@
   "Description": "Support domain customized key-value data, adding timestamp to transfer task.",
   "SchemaUpdateCqlFiles": [
     "domain_data.cql",
-    "transfer_timestamp.cql"
+    "transfer_timestamp.cql",
+    "event_batch_version.cql"
   ]
 }
